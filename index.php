@@ -124,6 +124,7 @@ function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'
         <button type="button" class="ghost" id="btn-quiz-doc" title="Generar un documento solo con los cuestionarios">Solo cuestionarios</button>
         <button type="button" class="ghost stop" data-stop>Detener</button>
       </div>
+      <span class="hint">Cada subtema se redacta en dos llamadas para obtener 4 párrafos completos. La generación puede tardar varios minutos.</span>
     </form>
 
     <!-- ---------- PRÁCTICA ---------- -->

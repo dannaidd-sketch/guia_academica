@@ -2,7 +2,7 @@
 
 Aplicación local (XAMPP + PHP 8 + Ollama) que genera con IA dos documentos académicos con el formato institucional:
 
-- **Guía Académica**: portada, presentación, capítulos con introducción, subtemas y un ejercicio práctico paso a paso por capítulo, referencias APA 7, anexos y hoja de vida del autor. Opcionalmente incluye cuestionarios de repaso y exámenes por parcial.
+- **Guía Académica**: portada, presentación, capítulos con introducción, subtemas desarrollados en **4 párrafos de ~8 líneas cada uno** y un ejercicio práctico paso a paso por capítulo, referencias APA 7, anexos y hoja de vida del autor. Opcionalmente incluye cuestionarios de repaso y exámenes por parcial.
 - **Guía de Prácticas en el Entorno Académico**: datos informativos, fundamentos, objetivo general y específicos, preparación previa, normas de seguridad, procedimiento, materiales, rúbrica y firmas.
 
 Está pensada para **usarse solo en este equipo**. La generación de texto se ejecuta localmente con Ollama; solo la búsqueda e inserción de imágenes usa internet.
@@ -46,6 +46,22 @@ Configuración:
 5. Pulsa **Solo cuestionarios** para crear un documento aparte con únicamente los cuestionarios y exámenes (misma portada institucional, también exportable a PDF/Word).
 
 > La IA puede equivocarse en alguna respuesta. Revisa las preguntas y la clave antes de imprimirlas. Si una sección sale incompleta, usa el selector **Regenerar sección…** de la barra superior. Cada examen se genera en 3 bloques; puede tardar varios minutos.
+
+## Contenido de los capítulos
+
+Cada capítulo se genera por partes para que el texto no se corte:
+
+- Una **introducción** de 120 a 180 palabras.
+- Cada **subtema** con **exactamente 4 párrafos**, generados en dos llamadas de dos párrafos. Cada párrafo debe tener **8 a 10 oraciones** (aproximadamente **120 a 150 palabras**, unas 8 líneas):
+  1. Definición y contexto.
+  2. Cómo funciona, sus elementos o su proceso.
+  3. Ejemplo aplicado a la carrera.
+  4. Buenas prácticas, errores comunes o recomendaciones.
+- Un **ejercicio práctico** paso a paso, si está marcada la casilla.
+
+Como cada subtema se genera en dos llamadas, la guía tarda más que antes, pero el contenido llega completo. Si el modelo devuelve más de dos párrafos en una llamada, la aplicación los agrupa en dos párrafos equilibrados para conservar la estructura de cuatro. Si un subtema sale corto o incompleto, regenéralo desde **Regenerar sección…**.
+
+> Para que la IA respete mejor la extensión, se recomienda `llama3.2:3b` (`ollama pull llama3.2:3b`). Con `qwen2.5:3b` también funciona, pero suele dividir el texto en más párrafos; el agrupado automático los normaliza.
 
 ## Seguridad
 

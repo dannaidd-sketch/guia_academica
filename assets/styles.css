@@ -160,7 +160,8 @@ label.check span{font-weight:600;font-size:12px;color:#374151}
 .doc h2{font-size:12pt;font-weight:700;margin:16px 0 6px;color:#000}
 .doc h3{font-size:12pt;font-weight:700;font-style:italic;margin:14px 0 5px;color:#000}
 .doc h4{font-size:12pt;font-weight:400;margin:12px 0 4px}
-.doc p{margin:0 0 8px;text-align:left;text-indent:1.27cm}
+.doc h2,.doc h3,.doc h4{page-break-after:avoid;break-after:avoid}
+.doc p{margin:0 0 8px;text-align:left;text-indent:1.27cm;orphans:2;widows:2}
 .doc p.center,.doc .center p,.doc figure p,.doc td p,.doc .muted,.doc figcaption{text-indent:0}
 .doc ul,.doc ol{margin:0 0 12px 1.27cm;padding:0}
 .doc li{margin:0 0 5px;text-align:left}

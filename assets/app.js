@@ -368,6 +368,65 @@
   /* ---------------------------------------------------------
      Cuestionarios
      --------------------------------------------------------- */
+  function renderParagraphs(target, text) {
+    let clean = cleanAiText(text);
+    /* Si el modelo repite el título como encabezado, se elimina:
+       el título ya está en el documento. */
+    clean = clean.replace(/^\s*#{1,6}\s+[^\n]*\n+/, '');
+    target.innerHTML = mdToHtml(clean) ||
+      '<p class="section-error">La IA no devolvió contenido. Intenta regenerar.</p>';
+  }
+
+  /* Dos párrafos por llamada. Si el modelo devuelve más, se agrupan
+     en dos párrafos equilibrados para mantener la estructura pedida. */
+  function renderParagraphPair(target, text) {
+    let clean = cleanAiText(text);
+    clean = clean.replace(/^\s*#{1,6}\s+[^\n]*\n+/, '');
+
+    let parrafos = clean
+      .split(/\n\s*\n/)
+      .map(p => p.replace(/\s*\n\s*/g, ' ').trim())
+      .filter(Boolean);
+
+    if (parrafos.length > 2) {
+      const conteo = parrafos.map(p => p.split(/\s+/).length);
+      const total = conteo.reduce((a, b) => a + b, 0);
+      let acumulado = 0;
+      let corte = 1;
+      for (let i = 0; i < parrafos.length; i++) {
+        acumulado += conteo[i];
+        if (acumulado >= total / 2) { corte = i + 1; break; }
+      }
+      corte = Math.min(Math.max(1, corte), parrafos.length - 1);
+      parrafos = [
+        parrafos.slice(0, corte).join(' '),
+        parrafos.slice(corte).join(' '),
+      ];
+    } else if (parrafos.length === 1) {
+      /* Si el modelo devolvió todo en un solo bloque, se divide en dos
+         párrafos por el límite de oración más cercano a la mitad. */
+      const oraciones = parrafos[0].match(/[^.!?]+[.!?]+(?:\s+|$)/g) || [];
+      if (oraciones.length >= 4) {
+        const cuenta = oraciones.map(o => o.trim().split(/\s+/).length);
+        const totalOraciones = cuenta.reduce((a, b) => a + b, 0);
+        let acumulado = 0;
+        let corte = 1;
+        for (let i = 0; i < oraciones.length; i++) {
+          acumulado += cuenta[i];
+          if (acumulado >= totalOraciones / 2) { corte = i + 1; break; }
+        }
+        corte = Math.min(Math.max(1, corte), oraciones.length - 1);
+        parrafos = [
+          oraciones.slice(0, corte).join(' ').replace(/\s+/g, ' ').trim(),
+          oraciones.slice(corte).join(' ').replace(/\s+/g, ' ').trim(),
+        ];
+      }
+    }
+
+    target.innerHTML = parrafos.map(p => `<p>${inline(p)}</p>`).join('') ||
+      '<p class="section-error">La IA no devolvió contenido. Intenta regenerar.</p>';
+  }
+
   function renderQuiz(target, text, keyTarget, keyLabel, start = 1) {
     const clean = cleanAiText(text);
     let body = clean;
@@ -637,33 +696,100 @@
     /* --- capítulos --- */
     chapters.forEach((ch, i) => {
       const n = i + 1;
+      const subtemas = ch.subtemas;
       const page = el('section', 'page');
       page.innerHTML = `
         <div class="img-slot">[ Imagen de presentación del capítulo ]</div>
         <h2>Capítulo ${n}. ${esc(ch.titulo)}</h2>
-        <div id="a-cap-${i}"></div>` +
+        <div id="a-intro-${i}"></div>` +
+        (subtemas.length
+          ? subtemas.map((s, j) =>
+              `<h3>${n}.${j + 1} ${esc(s)}</h3>` +
+              `<div id="a-sub-${i}-${j}-0"></div>` +
+              `<div id="a-sub-${i}-${j}-1"></div>`).join('')
+          : `<h3>Desarrollo</h3>` +
+            `<div id="a-dev-${i}-0"></div>` +
+            `<div id="a-dev-${i}-1"></div>`) +
         (conEjercicios
           ? `<h3>Ejercicio práctico de aplicación</h3><div id="a-ej-${i}"></div>`
           : '');
       doc.appendChild(page);
 
-      const subs = ch.subtemas.map((s, j) => `${n}.${j + 1} ${s}`).join('\n');
+      const listaSubtemas = subtemas.length
+        ? `Los subtemas del capítulo son: ${subtemas.join('; ')}.\n`
+        : '';
+
+      /* Introducción del capítulo: un solo párrafo */
       steps.push({
-        label: `Capítulo ${n}: ${ch.titulo}`,
-        target: `#a-cap-${i}`,
-        num_predict: 1700,
+        label: `Capítulo ${n}: introducción`,
+        target: `#a-intro-${i}`,
+        num_predict: 500,
         temperature: 0.55,
         prompt:
-          `Redacta el Capítulo ${n}: "${ch.titulo}" de la guía académica de la asignatura "${d.asignatura}" ` +
-          `(carrera: ${d.carrera}, nivel: ${d.nivel}).\n` +
-          `Primero escribe un párrafo introductorio de 120 a 180 palabras que defina el tema central, ` +
-          `su relevancia y el enfoque del capítulo, SIN encabezado.\n` +
-          `Después desarrolla cada subtema con el encabezado exacto "## ${n}.X Título del subtema" ` +
-          `y dos o tres párrafos de 90 a 140 palabras con explicación conceptual, un ejemplo aplicado ` +
-          `y una buena práctica.\n` +
-          `Subtemas:\n${subs}\n` +
-          `Usa lenguaje técnico actual y coherente con la carrera. No inventes citas textuales ni datos falsos.`
+          `Redacta la introducción del Capítulo ${n}: "${ch.titulo}" de la guía académica de la asignatura ` +
+          `"${d.asignatura}" (carrera: ${d.carrera}, nivel: ${d.nivel}).\n` +
+          `${listaSubtemas}` +
+          `Escribe UN SOLO párrafo de 120 a 180 palabras que defina el tema central, su relevancia y el ` +
+          `enfoque del capítulo.\n` +
+          `No escribas títulos, encabezados, listas ni viñetas; empieza directamente con el texto. ` +
+          `No inventes citas textuales ni datos falsos.`,
+        render: renderParagraphs
       });
+
+      /* Cada subtema: exactamente 4 párrafos, en dos llamadas de 2 párrafos */
+      const desarrolloParrafos = (baseId, etiqueta, tema, titulo) => {
+        const pares = [
+          {
+            num: '1-2',
+            aspecto:
+              `El primer párrafo presenta la definición y el contexto del concepto. ` +
+              `El segundo explica cómo funciona, sus elementos o su proceso.`
+          },
+          {
+            num: '3-4',
+            aspecto:
+              `El primer párrafo incluye un ejemplo aplicado a la carrera. ` +
+              `El segundo cierra con buenas prácticas, errores comunes o recomendaciones.`
+          }
+        ];
+
+        pares.forEach((par, k) => {
+          steps.push({
+            label: `${etiqueta} · párrafos ${par.num}`,
+            target: `#${baseId}-${k}`,
+            num_predict: 1000,
+            temperature: 0.55,
+            prompt:
+              `Redacta los párrafos ${par.num} del ${titulo} del Capítulo ${n}: "${ch.titulo}" ` +
+              `de la guía académica de la asignatura "${d.asignatura}" ` +
+              `(carrera: ${d.carrera}, nivel: ${d.nivel}).\n` +
+              `Tema a desarrollar: "${tema}".\n` +
+              `${listaSubtemas}` +
+              `Escribe EXACTAMENTE 2 párrafos. Cada párrafo debe tener entre 120 y 150 palabras ` +
+              `(8 a 10 oraciones completas). No resumas ni acortes las ideas.\n` +
+              `${par.aspecto}\n` +
+              `No escribas el título del tema ni ningún encabezado; empieza directamente con el primer párrafo. ` +
+              `No escribas etiquetas como "Párrafo 1:" ni numeración. ` +
+              `Devuelve SOLO los 2 párrafos separados por una línea en blanco. ` +
+              `No uses listas, viñetas, tablas ni bloques de código. ` +
+              `No inventes citas textuales ni datos falsos.`,
+            render: renderParagraphPair
+          });
+        });
+      };
+
+      if (subtemas.length) {
+        subtemas.forEach((sub, j) => {
+          desarrolloParrafos(
+            `a-sub-${i}-${j}`,
+            `Capítulo ${n}.${j + 1}: ${sub}`,
+            sub,
+            `subtema ${n}.${j + 1}`
+          );
+        });
+      } else {
+        desarrolloParrafos(`a-dev-${i}`, `Capítulo ${n}: desarrollo`, ch.titulo, 'tema central');
+      }
 
       if (conEjercicios) {
         steps.push({
@@ -2091,6 +2217,9 @@
     last: () => state.lastText || '',
     normalizeKey: normalizeQuizKey,
     renderQuiz,
+    renderParagraphs,
+    renderParagraphPair,
+    runSteps,
     buildAcademic,
     buildQuizDoc,
     chapters: chaptersFromUI,
