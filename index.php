@@ -190,6 +190,7 @@ function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'
         <button type="button" class="ghost" id="btn-images" title="Buscar imágenes del tema">Imágenes</button>
         <button type="button" class="ghost" id="btn-save" title="Guardar el documento (Ctrl+S)">Guardar</button>
         <button type="button" class="ghost" id="btn-open" title="Abrir un documento guardado">Abrir</button>
+        <button type="button" class="ghost" id="btn-history" title="Ver el historial de documentos generados">Historial</button>
         <button type="button" class="ghost" id="btn-restore" title="Recuperar el borrador no guardado" hidden>Borrador</button>
         <button type="button" class="ghost" id="btn-print" title="Imprimir o guardar como PDF">PDF</button>
         <button type="button" class="ghost" id="btn-word" title="Descargar en Word">Word</button>
@@ -321,6 +322,37 @@ function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'
       <button type="button" class="primary" id="docs-save">Guardar el documento actual</button>
       <button type="button" class="ghost" id="docs-save-as">Guardar como copia</button>
       <span id="docs-status"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HISTORIAL DE DOCUMENTOS GENERADOS ============ -->
+<div id="history-modal" class="modal" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <div>
+        <h3>Historial de documentos generados</h3>
+        <p class="muted">Cada documento terminado se guarda aquí automáticamente.</p>
+      </div>
+      <button type="button" class="icon" id="history-close" title="Cerrar">×</button>
+    </header>
+
+    <div class="history-tools">
+      <input type="search" id="history-search" placeholder="Buscar por título, tipo o fecha…" autocomplete="off">
+      <select id="history-filter" aria-label="Filtrar historial">
+        <option value="history">Generados</option>
+        <option value="manual">Guardados</option>
+        <option value="all">Todos</option>
+      </select>
+    </div>
+
+    <div id="history-list" class="docs-list">
+      <p class="muted">Cargando…</p>
+    </div>
+
+    <div class="modal-tools ai-actions">
+      <button type="button" class="ghost" id="history-refresh">Actualizar</button>
+      <span id="history-status"></span>
     </div>
   </div>
 </div>

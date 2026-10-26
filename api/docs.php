@@ -5,9 +5,9 @@ declare(strict_types=1);
  * Guardado y recuperación de documentos generados.
  *
  * Acciones:
- *   POST ?action=save    { id?, name, mode, title, html }  -> { id, savedAt }
+ *   POST ?action=save    { id?, name, mode, title, source?, html } -> { id, savedAt }
  *   GET  ?action=list                                      -> { docs: [...] }
- *   GET  ?action=load&id=xxxxxxxxxxxxxxxx                   -> { id, name, mode, title, html, savedAt }
+ *   GET  ?action=load&id=xxxxxxxxxxxxxxxx                   -> { id, name, mode, title, source, html, savedAt }
  *   POST ?action=delete  { id }                             -> { ok: true }
  */
 
@@ -102,6 +102,7 @@ switch ($action) {
             $mode = 'academica';
         }
         $title = mb_substr(trim((string) ($body['title'] ?? '')), 0, 200);
+        $source = (($body['source'] ?? 'manual') === 'history') ? 'history' : 'manual';
 
         /* Se limpia el HTML: sin scripts, iframes ni atributos activos */
         $html = sanitize_document_html((string) ($body['html'] ?? ''));
@@ -124,6 +125,7 @@ switch ($action) {
             'name'    => $name,
             'mode'    => $mode,
             'title'   => $title,
+            'source'  => $source,
             'savedAt' => $savedAt,
             'html'    => $html,
         ];
@@ -132,13 +134,14 @@ switch ($action) {
             send(['error' => 'No se pudo escribir el archivo. Revisa los permisos de la carpeta docs/.'], 500);
         }
 
-        $ok = updateIndex($idxFile, static function (array &$idx) use ($id, $name, $mode, $title, $savedAt, $html, $dir): void {
+        $ok = updateIndex($idxFile, static function (array &$idx) use ($id, $name, $mode, $title, $source, $savedAt, $html, $dir): void {
             $idx = array_values(array_filter($idx, static fn(array $d): bool => ($d['id'] ?? '') !== $id));
             $idx[] = [
                 'id'      => $id,
                 'name'    => $name,
                 'mode'    => $mode,
                 'title'   => $title,
+                'source'  => $source,
                 'savedAt' => $savedAt,
                 'size'    => strlen($html),
             ];
@@ -183,6 +186,7 @@ switch ($action) {
             'name'    => $doc['name'] ?? 'Documento',
             'mode'    => $doc['mode'] ?? 'academica',
             'title'   => $doc['title'] ?? '',
+            'source'  => (($doc['source'] ?? 'manual') === 'history') ? 'history' : 'manual',
             'savedAt' => $doc['savedAt'] ?? 0,
             'html'    => sanitize_document_html((string) $doc['html']),
         ]);

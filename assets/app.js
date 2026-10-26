@@ -35,6 +35,7 @@
     aiScope: 'section',
     docId: null,
     docName: '',
+    docSource: null,
   };
 
   const SYS = 'Eres docente del Instituto Superior Tecnológico El Libertador (ISTEL), Ecuador. ' +
@@ -255,10 +256,11 @@
   /* ---------------------------------------------------------
      Flujo de generación
      --------------------------------------------------------- */
-  async function runSteps(steps) {
+  async function runSteps(steps, options = {}) {
     state.steps = steps;
     state.docId = null;       /* documento nuevo: no sobrescribe el guardado */
     state.docName = '';
+    state.docSource = null;
     fillRegenSelect(steps);
     setBusy(true);
     setProgress(0, steps.length, 'Iniciando…');
@@ -299,10 +301,25 @@
           }
         }
       }
-      setProgress(steps.length, steps.length,
-        errores
-          ? `Documento listo con ${errores} error(es) · revisa o regenera las secciones marcadas`
-          : 'Documento listo · puedes editarlo');
+
+      if (errores) {
+        setProgress(steps.length, steps.length,
+          `Documento listo con ${errores} error(es) · revisa o regenera las secciones marcadas`);
+      } else {
+        let guardado = false;
+        if (options.history && hasContent()) {
+          setProgress(steps.length, steps.length, 'Guardando en el historial…');
+          guardado = await saveHistory();
+        }
+        if (guardado) {
+          setProgress(steps.length, steps.length, 'Documento listo y guardado en el historial');
+        } else {
+          setProgress(steps.length, steps.length, 'Documento listo · puedes editarlo');
+          if (options.history && hasContent()) {
+            flashStatus('Documento listo · no se pudo guardar en el historial', 6000);
+          }
+        }
+      }
     } catch (e) {
       doc.querySelectorAll('.streaming').forEach(n => n.classList.remove('streaming'));
       if (e.name === 'AbortError') {
@@ -1668,6 +1685,12 @@
     return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   }
 
+  function modeLabel(mode) {
+    return mode === 'practica'
+      ? 'Guía de práctica'
+      : (mode === 'cuestionarios' ? 'Cuestionarios' : 'Guía académica');
+  }
+
   /* ----- borrador automático (localStorage) ----- */
   function saveDraft() {
     if (!hasContent()) return;
@@ -1678,6 +1701,7 @@
         title: state.title,
         docId: state.docId,
         docName: state.docName,
+        docSource: state.docSource,
         at: Date.now(),
       }));
     } catch (e) { /* sin espacio: ignorar */ }
@@ -1709,6 +1733,7 @@
     state.title = d.title || state.title;
     state.docId = d.docId || null;
     state.docName = d.docName || '';
+    state.docSource = d.docSource || null;
     $('#btn-restore').hidden = true;
     flashStatus('Borrador restaurado');
   }
@@ -1720,8 +1745,51 @@
       name: (state.docName || state.title || 'Documento').trim(),
       mode: state.mode,
       title: state.title || '',
+      source: state.docSource || 'manual',
       html: doc.innerHTML,
     };
+  }
+
+  function historyDocName() {
+    const cover = doc.querySelector('.cover-title')?.textContent || '';
+    let base = (cover || state.title || 'Documento').replace(/\s+/g, ' ').trim();
+    base = base
+      .replace(/^Gu[ií]a Acad[eé]mica\s*-\s*/i, '')
+      .replace(/^Gu[ií]a de Pr[aá]ctica\s*-\s*/i, '')
+      .replace(/^Cuestionarios\s*-\s*/i, '')
+      .trim();
+    return `${modeLabel(state.mode)} · ${base}`.slice(0, 120);
+  }
+
+  async function saveHistory() {
+    if (!hasContent()) return false;
+    try {
+      const r = await apiFetch('api/docs.php?action=save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: '',
+          name: historyDocName(),
+          mode: state.mode,
+          title: state.title || '',
+          source: 'history',
+          html: doc.innerHTML,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'No se pudo guardar');
+
+      state.docId = data.id;
+      state.docName = data.name || historyDocName();
+      state.docSource = 'history';
+      saveDraft();
+      if ($('#history-modal') && !$('#history-modal').hidden) await refreshHistory();
+      if ($('#docs-modal') && !$('#docs-modal').hidden) await refreshDocs();
+      return true;
+    } catch (e) {
+      console.warn('[historial]', e);
+      return false;
+    }
   }
 
   async function saveDoc(asNew) {
@@ -1736,7 +1804,10 @@
 
     const payload = docPayload();
     payload.name = name;
-    if (asNew) payload.id = '';
+    if (asNew) {
+      payload.id = '';
+      payload.source = 'manual';
+    }
 
     const btns = ['#btn-save', '#docs-save', '#docs-save-as'].map(s => $(s)).filter(Boolean);
     btns.forEach(b => { b.disabled = true; });
@@ -1754,10 +1825,12 @@
 
       state.docId = data.id;
       state.docName = data.name;
+      state.docSource = payload.source || 'manual';
       if (st) st.textContent = 'Guardado ✔';
       flashStatus('Guardado · ' + new Date().toLocaleTimeString());
       updateRestoreButton();
       if ($('#docs-modal') && !$('#docs-modal').hidden) await refreshDocs();
+      if ($('#history-modal') && !$('#history-modal').hidden) await refreshHistory();
     } catch (e) {
       if (st) st.textContent = 'Error: ' + e.message;
       else flashStatus('Error al guardar: ' + e.message, 6000);
@@ -1767,6 +1840,7 @@
   }
 
   function openDocs() {
+    closeHistory();
     $('#docs-modal').hidden = false;
     $('#docs-status').textContent = '';
     refreshDocs();
@@ -1785,7 +1859,7 @@
       const data = await r.json();
       const docs = data.docs || [];
       if (!docs.length) {
-        list.innerHTML = '<p class="muted">Todavía no has guardado documentos.</p>';
+        list.innerHTML = '<p class="muted">Todavía no hay documentos.</p>';
         return;
       }
       list.innerHTML = '';
@@ -1795,15 +1869,81 @@
     }
   }
 
+  /* ----- historial de documentos generados ----- */
+  let historyDocs = [];
+
+  function openHistory() {
+    closeDocs();
+    $('#history-modal').hidden = false;
+    $('#history-status').textContent = '';
+    $('#history-search').value = '';
+    refreshHistory();
+  }
+
+  function closeHistory() {
+    const modal = $('#history-modal');
+    if (modal) modal.hidden = true;
+  }
+
+  async function refreshHistory() {
+    const list = $('#history-list');
+    if (!list) return;
+    list.innerHTML = '<p class="muted">Cargando…</p>';
+    const st = $('#history-status');
+    if (st) st.textContent = '';
+    try {
+      const r = await apiFetch('api/docs.php?action=list', { cache: 'no-store' });
+      const data = await r.json();
+      historyDocs = data.docs || [];
+      renderHistory();
+    } catch (e) {
+      list.innerHTML = `<p class="section-error">No se pudo leer el historial: ${esc(e.message)}</p>`;
+    }
+  }
+
+  function renderHistory() {
+    const list = $('#history-list');
+    if (!list) return;
+
+    const filtro = $('#history-filter')?.value || 'history';
+    const q = ($('#history-search')?.value || '').trim().toLowerCase();
+
+    let docs = historyDocs.filter(d =>
+      filtro === 'all' || (d.source || 'manual') === filtro
+    );
+
+    if (q) {
+      docs = docs.filter(d =>
+        `${d.name || ''} ${modeLabel(d.mode)} ${fmtDate(d.savedAt)}`.toLowerCase().includes(q)
+      );
+    }
+
+    if (!docs.length) {
+      const mensaje = q
+        ? 'No hay resultados para esa búsqueda.'
+        : filtro === 'history'
+          ? 'Todavía no hay documentos generados. Al terminar una guía aparecerá aquí. Si guardaste documentos antes, cambia el filtro a «Todos».'
+          : filtro === 'manual'
+            ? 'No hay documentos guardados manualmente.'
+            : 'No hay documentos en el historial.';
+      list.innerHTML = `<p class="muted">${mensaje}</p>`;
+      return;
+    }
+
+    list.innerHTML = '';
+    docs.forEach(d => list.appendChild(docRow(d)));
+  }
+
   function docRow(d) {
     const row = document.createElement('div');
     row.className = 'doc-row' + (state.docId === d.id ? ' current' : '');
-    const tipo = d.mode === 'practica'
-      ? 'Guía de práctica'
-      : (d.mode === 'cuestionarios' ? 'Cuestionarios' : 'Guía académica');
+    const tipo = modeLabel(d.mode);
+    const origen = (d.source || 'manual') === 'history'
+      ? '<span class="doc-badge generated">Generado</span>'
+      : '<span class="doc-badge">Guardado</span>';
     row.innerHTML = `<div class="info">
         <strong>${esc(d.name || 'Documento')}</strong>
-        <div class="meta">${esc(tipo)} · ${esc(fmtDate(d.savedAt))}${d.size ? ' · ' + esc(fmtSize(d.size)) : ''}</div>
+        <div class="meta">${origen} ${esc(tipo)} · ${esc(fmtDate(d.savedAt))}${d.size ? ' · ' + esc(fmtSize(d.size)) : ''}</div>
       </div>
       <div class="actions">
         <button type="button" class="primary" data-open>Abrir</button>
@@ -1815,7 +1955,9 @@
   }
 
   async function loadDoc(id) {
-    const st = $('#docs-status');
+    const st = ($('#history-modal') && !$('#history-modal').hidden)
+      ? $('#history-status')
+      : $('#docs-status');
     if (st) st.textContent = 'Abriendo…';
     try {
       const r = await apiFetch('api/docs.php?action=load&id=' + encodeURIComponent(id), { cache: 'no-store' });
@@ -1826,6 +1968,7 @@
       state.title = data.title || data.name || 'documento';
       state.docId = data.id;
       state.docName = data.name || '';
+      state.docSource = data.source || 'manual';
       doc.innerHTML = data.html;
 
       setProgress(0, 1, 'Documento abierto');
@@ -1833,6 +1976,7 @@
       saveDraft();
       flashStatus('Abierto: ' + (data.name || 'documento'));
       closeDocs();
+      closeHistory();
     } catch (e) {
       if (st) st.textContent = 'Error: ' + e.message;
     }
@@ -1840,7 +1984,9 @@
 
   async function removeDoc(id, name) {
     if (!confirm('¿Eliminar «' + (name || 'Documento') + '»? Esta acción no se puede deshacer.')) return;
-    const st = $('#docs-status');
+    const st = ($('#history-modal') && !$('#history-modal').hidden)
+      ? $('#history-status')
+      : $('#docs-status');
     try {
       const r = await apiFetch('api/docs.php?action=delete', {
         method: 'POST',
@@ -1849,8 +1995,13 @@
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'No se pudo eliminar');
-      if (state.docId === id) { state.docId = null; state.docName = ''; }
-      await refreshDocs();
+      if (state.docId === id) {
+        state.docId = null;
+        state.docName = '';
+        state.docSource = null;
+      }
+      if ($('#docs-modal') && !$('#docs-modal').hidden) await refreshDocs();
+      if ($('#history-modal') && !$('#history-modal').hidden) await refreshHistory();
       if (st) st.textContent = 'Documento eliminado';
     } catch (e) {
       if (st) st.textContent = 'Error: ' + e.message;
@@ -1862,11 +2013,23 @@
 
     $('#btn-save').onclick = () => saveDoc(false);
     $('#btn-open').onclick = openDocs;
+    $('#btn-history').onclick = openHistory;
     $('#btn-restore').onclick = restoreDraft;
     $('#docs-close').onclick = closeDocs;
     $('#docs-modal').addEventListener('click', e => { if (e.target.id === 'docs-modal') closeDocs(); });
     $('#docs-save').onclick = () => saveDoc(false);
     $('#docs-save-as').onclick = () => saveDoc(true);
+    $('#history-close').onclick = closeHistory;
+    $('#history-modal').addEventListener('click', e => { if (e.target.id === 'history-modal') closeHistory(); });
+    $('#history-refresh').onclick = () => refreshHistory();
+    $('#history-search').addEventListener('input', renderHistory);
+    $('#history-filter').addEventListener('change', renderHistory);
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if ($('#history-modal') && !$('#history-modal').hidden) closeHistory();
+      else if ($('#docs-modal') && !$('#docs-modal').hidden) closeDocs();
+    });
 
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 's') {
@@ -2095,6 +2258,7 @@
       </div>`;
       state.docId = null;
       state.docName = '';
+      state.docSource = null;
       try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* nada */ }
       updateRestoreButton();
       setProgress(0, 1, 'Listo');
@@ -2150,7 +2314,7 @@
       if (!d.titulo) { alert('Escribe el título de la guía.'); return; }
       if (!chaptersFromUI().length) { alert('Agrega al menos un capítulo.'); return; }
       const steps = buildAcademic(d);
-      await runSteps(steps);
+      await runSteps(steps, { history: true });
     };
 
     $('#btn-quiz-doc').onclick = async () => {
@@ -2164,7 +2328,7 @@
         return;
       }
       const steps = buildQuizDoc(d);
-      await runSteps(steps);
+      await runSteps(steps, { history: true });
     };
 
     $('#form-practica').onsubmit = async (e) => {
@@ -2173,7 +2337,7 @@
       const d = formData(e.target);
       if (!d.titulo) { alert('Escribe el título de la práctica.'); return; }
       const steps = buildPractice(d);
-      await runSteps(steps);
+      await runSteps(steps, { history: true });
     };
   }
 

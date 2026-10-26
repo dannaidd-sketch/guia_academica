@@ -27,7 +27,7 @@ También puedes abrir directamente <http://localhost/guia_academica/> si Apache 
 2. Completa los datos y pulsa **Generar**.
 3. El documento aparece en el panel derecho **en vivo y es editable**.
 4. Usa **Imágenes** para buscar e insertar fotografías del tema.
-5. Guarda con **Guardar** (o `Ctrl+S`); los documentos se abren desde **Abrir**.
+5. Guarda con **Guardar** (o `Ctrl+S`); los documentos se abren desde **Abrir** y cada generación terminada aparece en **Historial**.
 6. Exporta con **PDF** (imprimir) o **Word** (`.doc`).
 
 ## Cuestionarios
@@ -46,6 +46,18 @@ Configuración:
 5. Pulsa **Solo cuestionarios** para crear un documento aparte con únicamente los cuestionarios y exámenes (misma portada institucional, también exportable a PDF/Word).
 
 > La IA puede equivocarse en alguna respuesta. Revisa las preguntas y la clave antes de imprimirlas. Si una sección sale incompleta, usa el selector **Regenerar sección…** de la barra superior. Cada examen se genera en 3 bloques; puede tardar varios minutos.
+
+## Historial
+
+Cada generación que termina sin errores se guarda automáticamente en el **Historial**.
+
+- Pulsa **Historial** en la barra superior para abrir la ventana.
+- La lista muestra los documentos **Generados**, ordenados del más reciente al más antiguo, con tipo, fecha y tamaño.
+- Puedes **buscar** por título, tipo o fecha y cambiar el filtro a **Guardados** o **Todos**.
+- Desde cada fila puedes **Abrir** el documento para seguir editándolo o **Eliminar** la entrada.
+- Si un documento generado se abre y luego se guarda con **Guardar**, se actualiza esa misma entrada. **Guardar como copia** crea un documento aparte, marcado como guardado manual.
+
+El historial usa la misma carpeta `docs/` y el mismo límite de 200 documentos. Si se supera, se eliminan automáticamente los más antiguos. Si una generación termina con errores, no se guarda sola; puedes revisarla y guardarla manualmente.
 
 ## Contenido de los capítulos
 
