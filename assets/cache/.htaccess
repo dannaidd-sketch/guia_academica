@@ -1,0 +1,6 @@
+# Imágenes descargadas: se sirven, pero sin listado y sin ejecutar código
+Options -Indexes
+
+<FilesMatch "\.(php|phtml|phar|cgi|pl|py|sh|htaccess)$">
+    Require all denied
+</FilesMatch>

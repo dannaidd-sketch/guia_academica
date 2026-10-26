@@ -1,0 +1,17 @@
+# Configuración local (límites de la aplicación)
+/config.php
+
+# Documentos y cachés generados en tiempo de ejecución
+/docs/*.json
+/docs/*.tmp
+/cache/*
+!/cache/.htaccess
+/assets/cache/*
+!/assets/cache/.htaccess
+
+# Temporales y sistema
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+desktop.ini

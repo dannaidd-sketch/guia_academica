@@ -1,0 +1,33 @@
+# Generador de Guías · ISTEL — configuración de Apache
+
+# Uso solo en este equipo: acepta únicamente conexiones desde localhost.
+# Si algún día quieres abrirlo en la red local, comenta la línea siguiente.
+Require ip 127.0.0.1 ::1
+
+Options -Indexes
+DirectoryIndex index.php
+
+# Bloquear archivos internos que no deben servirse por HTTP
+<FilesMatch "\.(json|md|log|ini|sql|bak|example\.php)$">
+    Require all denied
+</FilesMatch>
+
+# Configuración: nunca debe ejecutarse ni mostrarse desde el navegador
+<FilesMatch "^(config|config\.example)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Bloquear archivos ocultos (.git, .env, etc.)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Bloquear la carpeta .git en cualquier profundidad
+RedirectMatch 404 (?i)/\.git(/|$)
+
+# Cabeceras básicas de seguridad
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+</IfModule>
